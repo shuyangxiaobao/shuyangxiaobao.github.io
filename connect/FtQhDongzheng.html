@@ -1,0 +1,276 @@
+
+ <!DOCTYPE html>
+ <html>
+ <head>
+     <meta charset="utf-8">
+     <title>跳转</title>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <style>
+         body {
+             margin: 0;
+             padding: 0;
+             background: #fff;
+         }
+         #go {
+             width: 100%;
+             height: 100vh;
+             font-size: 22px;
+             background: #007aff;
+             color: white;
+             border: none;
+             outline: none;
+         }
+     </style>
+ </head>
+ <body>
+     <button id="go">打开筋斗云</button>
+
+     <script>
+         const qdaiSiteCid = "FtQhDongzheng"; // AI: 站点 CID 只在这里维护，剪贴板和 Universal Link 都从这里取。
+         const qdaiUniversalLinkHost = "shuyangxiaobao.github.io"; // AI: GitHub Pages 测试域名，App entitlement 和 AASA 必须同时配置该域名。
+         const qdaiUniversalLinkUrl = "https://" + qdaiUniversalLinkHost + "/connect/" + qdaiSiteCid + ".html"; // AI: GitHub Pages 正式测试入口，路径必须和 AASA paths 完全一致。
+         const qdaiLocalSchemeUrl = "flexitrader://"; // AI: 本地 file、localhost、局域网 IP 测试时无法触发 Universal Link，用 scheme 验证已安装 App 拉起。
+         const qdaiAppStoreUrl = "https://apps.apple.com/app/id1587648528"; // AI: 筋斗云 App Store 下载地址，未安装或拉起失败时跳转。
+         const qdaiAndroidSchemeUrl = "quantdo://instrumentlist:8081/Flexitrader"; // AI: 安卓使用当前 APK 已注册的外部唤起地址，优先打开正式筋斗云。
+         const qdaiAndroidDownloadUrl = "https://flexitrader.quantdo.com.cn/download"; // AI: 安卓未安装筋斗云时直接跳转的 APK 下载地址。
+         let qdaiIsOpening = false; // AI: 防止用户连续点击页面导致重复触发 Universal Link 和 App Store 跳转。
+         let qdaiLocalFallbackTimer = null; // AI: 本地 scheme 测试时保存 App Store 兜底定时器。
+         let qdaiLocalFocusFallbackTimer = null; // AI: 本地 scheme 失焦后回到 Safari 时，延迟确认是否需要跳 App Store。
+         let qdaiLocalBlurred = false; // AI: 记录本地 scheme 打开后是否触发过失焦，用来区分已拉起 App 和无效网址弹框。
+         let qdaiLocalOpenTime = 0; // AI: 记录本地 scheme 开始时间，Safari 很快回到焦点时按未安装处理。
+         let qdaiAndroidFallbackTimer = null; // AI: 安卓 scheme 拉起失败时保存下载页兜底定时器。
+         let qdaiAndroidOpening = false; // AI: 安卓正在尝试拉起 App，用来判断 blur/pagehide 是否应该取消下载兜底。
+
+         function copyText(text) {
+             return new Promise((resolve, reject) => {
+                 if (navigator.clipboard) {
+                     navigator.clipboard.writeText(text).then(resolve).catch(reject);
+                 } else {
+                     let input = document.createElement('input');
+                     input.value = text;
+                     document.body.appendChild(input);
+                     input.select();
+                     let suc = document.execCommand('copy');
+                     document.body.removeChild(input);
+                     suc ? resolve() : reject();
+                 }
+             });
+         }
+
+         function copyTextSync(text) {
+             let input = document.createElement('input');
+             input.value = text;
+             input.style.position = 'fixed';
+             input.style.left = '-9999px';
+             input.style.top = '-9999px';
+             document.body.appendChild(input);
+             input.focus();
+             input.select();
+             input.setSelectionRange(0, input.value.length);
+             let suc = false;
+             try {
+                 suc = document.execCommand('copy');
+             } catch (e) {
+                 suc = false;
+             }
+             document.body.removeChild(input);
+             return suc;
+         }
+
+         function qdaiIsIOS() {
+             return /iPhone|iPad|iPod/.test(navigator.userAgent); // AI: 仅苹果移动设备需要走 Universal Link 拉起 App。
+         }
+
+         function qdaiIsAndroid() {
+             return /Android/i.test(navigator.userAgent); // AI: 安卓设备走 intent 拉起筋斗云，未安装时由浏览器 fallback 到 APK 下载页。
+         }
+
+         function qdaiIsUniversalLinkPage() {
+             return window.location.hostname === qdaiUniversalLinkHost; // AI: 当前已经落在 Universal Link 域名时，说明未被 App 接管，需要走下载兜底。
+         }
+
+         function qdaiIsLocalTestPage() {
+             let qdaiHostName = window.location.hostname; // AI: 获取当前页面 host，用来区分本地调试和正式 Universal Link 域名。
+             return window.location.protocol === "file:" || qdaiHostName === "localhost" || qdaiHostName === "127.0.0.1" || /^192\.168\.\d{1,3}\.\d{1,3}$/.test(qdaiHostName) || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(qdaiHostName) || /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(qdaiHostName); // AI: 本地文件、localhost 和常见局域网 IP 都只能用 scheme 做本地拉起测试。
+         }
+
+         function qdaiJumpToAppStore() {
+             window.location.href = qdaiAppStoreUrl; // AI: 未安装筋斗云或 Universal Link 未接管时跳转 App Store。
+             qdaiIsOpening = false; // AI: 释放点击状态，用户返回页面后仍可再次点击。
+         }
+
+         function qdaiJumpToUniversalLink() {
+             window.location.href = qdaiUniversalLinkUrl; // AI: 通过 https Universal Link 交给 iOS 判断打开 App 或落到下载页。
+         }
+
+         function qdaiOpenAndroidAppOrDownload() {
+             if (qdaiAndroidFallbackTimer) { // AI: 新一轮安卓拉起前先清理旧兜底。
+                 clearTimeout(qdaiAndroidFallbackTimer);
+                 qdaiAndroidFallbackTimer = null;
+             }
+             qdaiAndroidOpening = true; // AI: 标记当前安卓正在尝试拉起 App。
+             qdaiAndroidFallbackTimer = setTimeout(function () { // AI: 如果页面一直没有隐藏，认为 App 没有被拉起，进入下载页。
+                 if (!document.hidden && document.visibilityState !== "hidden") {
+                     window.location.href = qdaiAndroidDownloadUrl;
+                 }
+                 qdaiAndroidFallbackTimer = null;
+                 qdaiAndroidOpening = false;
+                 qdaiIsOpening = false;
+             }, 3500);
+             window.location.href = qdaiAndroidSchemeUrl; // AI: 通用安卓浏览器优先尝试 scheme 拉起 App。
+         }
+
+         function qdaiCancelAndroidFallbackIfNeeded() {
+             if (!qdaiAndroidFallbackTimer && !qdaiAndroidOpening) {
+                 return;
+             }
+             if (qdaiAndroidFallbackTimer) {
+                 clearTimeout(qdaiAndroidFallbackTimer);
+             }
+             qdaiAndroidFallbackTimer = null;
+             qdaiAndroidOpening = false;
+             qdaiIsOpening = false;
+         }
+
+         function qdaiOpenLocalSchemeForTest() {
+             if (qdaiLocalFocusFallbackTimer) { // AI: 新一轮本地测试开始前，清理上一轮 focus 延迟兜底。
+                 clearTimeout(qdaiLocalFocusFallbackTimer); // AI: 避免上一轮回焦任务影响本轮点击。
+                 qdaiLocalFocusFallbackTimer = null; // AI: 清空 focus 延迟定时器引用。
+             }
+             qdaiLocalBlurred = false; // AI: 每次本地测试重新记录本轮是否失焦。
+             qdaiLocalOpenTime = Date.now(); // AI: 每次本地测试重新记录 scheme 触发时间。
+             qdaiLocalFallbackTimer = setTimeout(function () { // AI: 本地 scheme 拉起失败时，延迟跳 App Store 兜底。
+                 if (!document.hidden && document.visibilityState !== "hidden" && !qdaiLocalBlurred) { // AI: 页面一直可见且没有失焦，说明 App 没有被拉起。
+                     qdaiJumpToAppStore(); // AI: 本地测试未安装 App 时跳转 App Store。
+                 }
+                 qdaiLocalFallbackTimer = null; // AI: 清空本地兜底定时器引用。
+             }, 1800); // AI: 给 iOS 足够时间切换到本地已安装 App。
+             window.location.href = qdaiLocalSchemeUrl; // AI: 仅本地测试使用 scheme，正式环境不用 scheme。
+         }
+
+         function qdaiCancelLocalFallbackIfNeeded() {
+             if (!qdaiLocalFallbackTimer && !qdaiLocalFocusFallbackTimer && !qdaiLocalBlurred) { // AI: 没有本地 scheme 兜底任务和失焦记录时直接返回。
+                 return; // AI: 避免无关页面生命周期事件影响正式 Universal Link 流程。
+             }
+             if (qdaiLocalFallbackTimer) { // AI: 仍有本地 App Store 兜底定时器时才需要取消。
+                 clearTimeout(qdaiLocalFallbackTimer); // AI: 已经拉起 App 或页面离开时取消 App Store 兜底。
+             }
+             if (qdaiLocalFocusFallbackTimer) { // AI: 仍有回焦后的 App Store 延迟兜底时也需要取消。
+                 clearTimeout(qdaiLocalFocusFallbackTimer); // AI: App 已经打开或页面离开时取消回焦兜底。
+             }
+             qdaiLocalFallbackTimer = null; // AI: 清空定时器，避免返回页面后误跳下载。
+             qdaiLocalFocusFallbackTimer = null; // AI: 清空 focus 延迟定时器，避免返回 Safari 后误跳下载。
+             qdaiLocalBlurred = false; // AI: App 已经打开或页面已经离开时清空失焦记录，避免返回 Safari 后误判未安装。
+             qdaiIsOpening = false; // AI: 用户回到网页后可以再次测试。
+         }
+
+         function qdaiHandleLocalBlur() {
+             if (!qdaiLocalFallbackTimer) { // AI: 没有本地 scheme 兜底任务时忽略普通失焦。
+                 return; // AI: 避免 Safari 地址栏、系统 UI 等失焦影响页面跳转。
+             }
+             qdaiLocalBlurred = true; // AI: 本地 scheme 触发后发生失焦，可能是 App 被拉起，也可能是无效网址弹框。
+             clearTimeout(qdaiLocalFallbackTimer); // AI: 先取消定时器，避免已安装 App 打开后继续跳 App Store。
+             qdaiLocalFallbackTimer = null; // AI: 清空定时器，后续由 focus 判断是否是未安装弹框返回。
+         }
+
+         function qdaiHandleLocalFocus() {
+             if (!qdaiLocalBlurred) { // AI: 没有本地 scheme 失焦记录时不处理。
+                 return; // AI: 避免普通页面回到焦点时误跳 App Store。
+             }
+             let qdaiElapsedTime = Date.now() - qdaiLocalOpenTime; // AI: 计算从触发 scheme 到 Safari 回到焦点的间隔。
+             if (qdaiLocalFocusFallbackTimer) { // AI: 已经存在回焦兜底时先清理旧任务。
+                 clearTimeout(qdaiLocalFocusFallbackTimer); // AI: 保证只有最后一次回焦判断生效。
+                 qdaiLocalFocusFallbackTimer = null; // AI: 清空旧任务引用。
+             }
+             if (qdaiElapsedTime < 5000 && !document.hidden && document.visibilityState !== "hidden") { // AI: 很快回到 Safari 可能是无效网址弹框，也可能是打开确认框，不能立刻跳商店。
+                 qdaiLocalFocusFallbackTimer = setTimeout(function () { // AI: 延迟确认 Safari 是否仍停留在前台。
+                     if (qdaiLocalBlurred && !document.hidden && document.visibilityState !== "hidden") { // AI: 延迟后页面仍可见，才认为本地 App 未安装。
+                         qdaiLocalBlurred = false; // AI: 消费本轮失焦记录，避免重复跳转。
+                         qdaiLocalFocusFallbackTimer = null; // AI: 清空 focus 延迟定时器引用。
+                         qdaiJumpToAppStore(); // AI: 本地卸载 App 测试时，关闭无效网址弹框后跳转 App Store。
+                     }
+                 }, 1800); // AI: 给 iOS 打开确认框到真正切 App 留出时间，避免已安装 App 后又跳 App Store。
+                 return; // AI: 回焦后的最终判断交给延迟任务处理。
+             }
+             qdaiLocalBlurred = false; // AI: 超过确认窗口时清理失焦记录，不再触发 App Store。
+             qdaiIsOpening = false; // AI: 释放点击状态，允许用户再次测试。
+         }
+
+         function qdaiOpenAfterCopy() {
+             if (qdaiIsAndroid()) { // AI: 安卓设备优先走 Android intent，不进入 iOS 的 Universal Link 或 App Store 分支。
+                 qdaiOpenAndroidAppOrDownload(); // AI: 已安装打开筋斗云，未安装跳转 APK 下载页。
+                 return; // AI: 安卓跳转已处理完成。
+             }
+             if (qdaiIsIOS() && qdaiIsLocalTestPage()) { // AI: 本地调试无法验证 Universal Link，使用 scheme 验证已安装 App 可被拉起。
+                 qdaiOpenLocalSchemeForTest(); // AI: 本地环境下打开当前测试机安装的筋斗云 App。
+                 return; // AI: 本地 scheme 已开始处理，后续不再走正式 Universal Link。
+             }
+             if (qdaiIsIOS() && !qdaiIsUniversalLinkPage()) { // AI: iPhone 上从普通二维码页点击时，先尝试 Universal Link 拉起 App。
+                 qdaiJumpToUniversalLink(); // AI: 已安装筋斗云时 iOS 会直接打开 App，不再弹无效网址。
+                 return; // AI: Universal Link 已交给系统处理，当前页不再继续跳下载页。
+             }
+             qdaiJumpToAppStore(); // AI: 已经落到 Universal Link 网页或非 iOS 设备时，直接进入下载页。
+         }
+
+         function qdaiOpenAppOrStore() {
+             if (qdaiIsOpening) { // AI: 已经在处理一次点击时直接返回，避免重复跳转。
+                 return; // AI: 连续点击页面不重复创建 fallback 定时器。
+             }
+             qdaiIsOpening = true; // AI: 标记本次点击已经开始处理。
+             document.getElementById('go').innerText = "正在打开..."; // AI: 给用户明确反馈，说明页面正在尝试打开筋斗云或下载页。
+
+             if (qdaiIsAndroid()) { // AI: 安卓外部拉起必须尽量在用户点击同步栈里触发，避免等待剪贴板 Promise 后被 Chrome 拦截。
+                 if (copyTextSync(qdaiSiteCid)) { // AI: 安卓必须确保站点标识已写入剪贴板，App 打开后会读取该标识。
+                     qdaiOpenAfterCopy(); // AI: 仍在点击同步栈内立即尝试拉起本地 App。
+                 } else {
+                     qdaiIsOpening = false;
+                     document.getElementById('go').innerText = "复制失败，请重新点击";
+                     alert("复制站点标识失败，请重新点击或使用 Chrome 打开页面后再试。");
+                 }
+                 return;
+             }
+
+             copyText(qdaiSiteCid).then(() => {
+                 console.log("复制成功 ✅");
+                 qdaiOpenAfterCopy(); // AI: 复制站点标识成功后再跳转，便于 App 打开后读取剪贴板参数。
+             }).catch(() => {
+                 console.log("复制失败，但继续跳转");
+                 qdaiOpenAfterCopy(); // AI: 复制失败不阻断跳转，继续走 Universal Link 或 App Store。
+             });
+         }
+
+         window.addEventListener('load', function () {
+             if (qdaiIsIOS() && qdaiIsUniversalLinkPage()) { // AI: iPhone 进入 Universal Link 网页说明 App 未安装或未接管链接。
+                 setTimeout(qdaiJumpToAppStore, 600); // AI: 正式 Universal Link 页面不能自动走 scheme，否则未安装 App 时 Safari 会弹“网址无效”。
+             }
+         });
+
+         document.addEventListener('visibilitychange', function () {
+             if (document.hidden && (qdaiLocalFallbackTimer || qdaiLocalBlurred)) { // AI: 本地 scheme 测试成功拉起 App 时页面会隐藏。
+                 qdaiCancelLocalFallbackIfNeeded(); // AI: App 已打开时取消本地 App Store 兜底。
+             }
+             if (document.hidden && qdaiAndroidFallbackTimer) { // AI: 安卓成功拉起 App 时页面会隐藏，取消下载兜底。
+                 qdaiCancelAndroidFallbackIfNeeded();
+             }
+         });
+
+         window.addEventListener('pagehide', function () {
+             qdaiCancelLocalFallbackIfNeeded(); // AI: Safari 切到筋斗云 App 时可能只触发页面离开，用 pagehide 取消兜底。
+             qdaiCancelAndroidFallbackIfNeeded(); // AI: 安卓浏览器离开当前页时取消下载兜底。
+         });
+
+         window.addEventListener('blur', function () {
+             qdaiHandleLocalBlur(); // AI: 本地 scheme 触发失焦时先取消定时器，避免已打开 App 后又跳 App Store。
+             if (qdaiAndroidOpening) { // AI: 安卓拉起 App、弹出系统打开提示或切换应用时通常会先失焦，先取消下载兜底，避免误跳下载页。
+                 qdaiCancelAndroidFallbackIfNeeded();
+             }
+         });
+
+         window.addEventListener('focus', function () {
+             qdaiHandleLocalFocus(); // AI: 卸载 App 时关闭 Safari 无效网址弹框后回到焦点，再跳 App Store。
+         });
+
+         document.body.onclick = qdaiOpenAppOrStore; // AI: 按需求让用户点击页面任意位置都触发打开筋斗云或 App Store。
+     </script>
+ </body>
+ </html>
