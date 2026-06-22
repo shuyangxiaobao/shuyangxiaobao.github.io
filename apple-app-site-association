@@ -6,6 +6,9 @@
         "appID": "CU6938ADRC.qdinfini.com.cn.10003",
         "paths": [
           "/connect/FtQhDongzheng.html",
+          "/connect/FtQhXinhu.html",
+          "/connect/FtQhYinhe.html",
+          "/connect/FtQhZhongxinjiantou.html",
           "/app/*",
           "/download_app/*"
         ]
