@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>打开筋斗云</title>
+    <title>打开东证期货</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <style>
         html,
@@ -53,7 +53,7 @@
 </head>
 <body>
     <a id="go" href="https://flexitrader.quantdo.com.cn/connect/FtQhDongzheng.html">
-        <span class="title">打开筋斗云</span>
+        <span class="title">打开东证期货</span>
         <span class="status" id="status"></span>
     </a>
 
@@ -78,8 +78,8 @@
 
         function qdaiResolveSiteCid() {
             const fileName = window.location.pathname.split("/").pop() || "FtQhDongzhengOpen.html";
-            const match = fileName.match(/^(FtQh[A-Za-z]+)(?:Open)?.html$/);
-            return match && qdaiSiteNames[match[1]] ? match[1] : "FtQhDongzheng";
+            const siteCid = fileName.replace(/Open\.html$/, "").replace(/\.html$/, "");
+            return qdaiSiteNames[siteCid] ? siteCid : "FtQhDongzheng";
         }
 
         function qdaiIsIOS() {
