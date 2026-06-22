@@ -29,6 +29,8 @@
             gap: 12px;
             cursor: pointer;
             touch-action: manipulation;
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         #go:active {
@@ -50,10 +52,10 @@
     </style>
 </head>
 <body>
-    <button id="go" type="button">
+    <a id="go" href="https://flexitrader.quantdo.com.cn/connect/FtQhDongzheng.html">
         <span class="title">打开筋斗云</span>
         <span class="status" id="status"></span>
-    </button>
+    </a>
 
     <script>
         const qdaiSiteCid = "FtQhDongzheng";
@@ -166,20 +168,28 @@
                 qdaiOpenAndroidAppOrDownload();
                 return;
             }
-            if (qdaiIsIOS()) {
-                window.location.href = qdaiUniversalLinkUrl;
-                return;
-            }
             qdaiJumpToAppStore();
         }
 
-        function qdaiOpenAppOrStore() {
+        function qdaiOpenAppOrStore(event) {
             if (qdaiIsOpening) {
+                if (event) {
+                    event.preventDefault();
+                }
                 return;
             }
             qdaiIsOpening = true;
             document.getElementById("go").querySelector(".title").innerText = "正在打开...";
             qdaiSetStatus("");
+
+            if (qdaiIsIOS()) {
+                qdaiCopyTextSync(qdaiSiteCid);
+                return;
+            }
+
+            if (event) {
+                event.preventDefault();
+            }
 
             if (qdaiCopyTextSync(qdaiSiteCid)) {
                 qdaiOpenAfterCopy();
@@ -198,6 +208,7 @@
             });
         }
 
+        document.getElementById("go").href = qdaiUniversalLinkUrl;
         document.getElementById("go").addEventListener("click", qdaiOpenAppOrStore);
 
         document.addEventListener("visibilitychange", function () {
