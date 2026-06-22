@@ -27,9 +27,9 @@
 
      <script>
          const qdaiSiteCid = "FtQhDongzheng"; // AI: 站点 CID 只在这里维护，剪贴板和 Universal Link 都从这里取。
-         const qdaiUniversalLinkHost = "flexitrader.quantdo.com.cn"; // AI: App entitlement 中配置的 Universal Link 域名。
-         const qdaiUniversalLinkPath = "/connect/" + qdaiSiteCid + ".html"; // AI: 筋斗云线上部署在 connect 目录，Universal Link 路径必须和 AASA paths 完全一致。
-         const qdaiUniversalLinkUrl = "https://" + qdaiUniversalLinkHost + qdaiUniversalLinkPath; // AI: 筋斗云线上部署在 connect 目录，Universal Link 路径必须和 AASA paths 完全一致。
+         const qdaiUniversalLinkHost = "shuyangxiaobao.github.io"; // AI: GitHub Pages 测试 Universal Link 域名，App entitlement 和 AASA 都要包含它。
+         const qdaiUniversalLinkPath = "/connect/" + qdaiSiteCid + ".html"; // AI: GitHub Pages 测试路径，必须和 AASA paths 完全一致。
+         const qdaiUniversalLinkUrl = "https://" + qdaiUniversalLinkHost + qdaiUniversalLinkPath; // AI: 用于 GitHub Pages 直连 Universal Link 测试。
          const qdaiAppStoreUrl = "https://apps.apple.com/app/id1587648528"; // AI: 筋斗云 App Store 下载地址，未安装或拉起失败时跳转。
          const qdaiAndroidSchemeUrl = "quantdo://instrumentlist:8081/Flexitrader"; // AI: 安卓使用当前 APK 已注册的外部唤起地址，优先打开正式筋斗云。
          const qdaiAndroidDownloadUrl = "https://flexitrader.quantdo.com.cn/download"; // AI: 安卓未安装筋斗云时直接跳转的 APK 下载地址。
