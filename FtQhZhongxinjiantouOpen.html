@@ -52,7 +52,7 @@
     </style>
 </head>
 <body>
-    <a id="go" href="https://flexitrader.quantdo.com.cn/connect/FtQhZhongxinjiantou.html">
+    <a id="go" href="https://shuyangxiaobao.github.io/connect/FtQhZhongxinjiantou.html">
         <span class="title">打开中信建投</span>
         <span class="status" id="status"></span>
     </a>
@@ -66,8 +66,8 @@
 };
         const qdaiSiteCid = qdaiResolveSiteCid();
         const qdaiSiteName = qdaiSiteNames[qdaiSiteCid] || "筋斗云";
-        // GitHub Pages 入口页使用 shuyangxiaobao.github.io，点击后跳到 flexitrader.quantdo.com.cn 的 Universal Link，避免 iOS Safari 同域跳转留在浏览器。
-        const qdaiUniversalLinkUrl = "https://flexitrader.quantdo.com.cn/connect/" + qdaiSiteCid + ".html";
+        // 当前测试环境部署在 GitHub Pages，Universal Link 也使用 shuyangxiaobao.github.io。
+        const qdaiUniversalLinkUrl = "https://shuyangxiaobao.github.io/connect/" + qdaiSiteCid + ".html";
         const qdaiAppStoreUrl = "https://apps.apple.com/app/id1587648528";
         const qdaiAndroidSchemeUrl = "quantdo://instrumentlist:8081/Flexitrader";
         const qdaiAndroidDownloadUrl = "https://flexitrader.quantdo.com.cn/download";
